@@ -1,25 +1,70 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { UserPreferences, Playlist, AppStage } from './types';
 import { generatePlaylist } from './services/geminiService';
+import { getAccessToken, redirectToAuthFlow, exportPlaylistToSpotify } from './services/spotifyService';
 import UserInput from './components/UserInput';
 import PlaylistDisplay from './components/PlaylistDisplay';
 import Loader from './components/Loader';
 import { MusicIcon } from './components/icons';
+import { CLIENT_ID } from './spotify.config';
 
 const App: React.FC = () => {
-  const [user1Prefs, setUser1Prefs] = useState<UserPreferences>({ songs: '', artists: '', genres: '' });
-  const [user2Prefs, setUser2Prefs] = useState<UserPreferences>({ songs: '', artists: '', genres: '' });
+  const [user1Prefs, setUser1Prefs] = useState<UserPreferences>({ songs: '', genres: '' });
+  const [user2Prefs, setUser2Prefs] = useState<UserPreferences>({ songs: '', genres: '' });
   const [context, setContext] = useState('');
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stage, setStage] = useState<AppStage>(AppStage.INPUT);
+  const [stage, setStage] = useState<AppStage>(AppStage.INPUT_USER_1);
+
+  // Spotify Export State
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccessUrl, setExportSuccessUrl] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [spotifyAuthError, setSpotifyAuthError] = useState<string | null>(null);
+  const [isSpotifyReady, setIsSpotifyReady] = useState(false);
+
+
+  // Handle Spotify Auth Callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const error = params.get('error');
+
+    if (error) {
+      setSpotifyAuthError("Spotify authentication failed. Please try again.");
+      // Clean up URL
+      window.history.pushState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (code) {
+      // We have a code, let's exchange it for a token
+      getAccessToken(CLIENT_ID, code)
+        .then(() => {
+          setIsSpotifyReady(true);
+           // Clean up URL and remove code
+          window.history.pushState({}, document.title, window.location.pathname);
+        })
+        .catch(err => {
+          console.error(err);
+          setSpotifyAuthError("Failed to get Spotify access token.");
+        });
+    } else {
+        // Check if token already exists in local storage
+        if (localStorage.getItem('spotify_access_token')) {
+            setIsSpotifyReady(true);
+        }
+    }
+  }, []);
 
   const handleGenerate = useCallback(async (size: 'taster' | 'full') => {
     setIsLoading(true);
     setError(null);
     setPlaylist(null);
+    setExportSuccessUrl(null);
+    setExportError(null);
 
     try {
       const result = await generatePlaylist(user1Prefs, user2Prefs, context, size);
@@ -31,24 +76,56 @@ const App: React.FC = () => {
       }
     } catch (err) {
       setError(err instanceof Error ? `Failed to generate playlist: ${err.message}` : 'An unknown error occurred.');
-      setStage(AppStage.INPUT);
+      setStage(AppStage.INPUT_USER_2);
     } finally {
       setIsLoading(false);
     }
   }, [user1Prefs, user2Prefs, context]);
 
   const resetApp = () => {
-    setUser1Prefs({ songs: '', artists: '', genres: '' });
-    setUser2Prefs({ songs: '', artists: '', genres: '' });
+    setUser1Prefs({ songs: '', genres: '' });
+    setUser2Prefs({ songs: '', genres: '' });
     setContext('');
     setPlaylist(null);
     setError(null);
-    setStage(AppStage.INPUT);
+    setExportSuccessUrl(null);
+    setExportError(null);
+    setSpotifyAuthError(null);
+    setStage(AppStage.INPUT_USER_1);
   };
 
-  const isFormValid = 
-    (user1Prefs.songs || user1Prefs.artists || user1Prefs.genres) &&
-    (user2Prefs.songs || user2Prefs.artists || user2Prefs.genres) &&
+  const handleExportPlaylist = async () => {
+    if (!playlist) return;
+    
+    setExportError(null);
+    setExportSuccessUrl(null);
+
+    if (!isSpotifyReady) {
+        if (CLIENT_ID === "PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE") {
+             setExportError("Spotify Client ID is not configured. Please update spotify.config.ts");
+             return;
+        }
+        await redirectToAuthFlow(CLIENT_ID);
+        return;
+    }
+
+    setIsExporting(true);
+    try {
+        const spotifyPlaylist = await exportPlaylistToSpotify(playlist.songs, playlist.playlistName);
+        setExportSuccessUrl(spotifyPlaylist.external_urls.spotify);
+    } catch (err) {
+        console.error(err);
+        setExportError(err instanceof Error ? err.message : "An unknown error occurred during export.");
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+
+  const isUser1FormValid = !!(user1Prefs.songs || user1Prefs.genres);
+  const isFormValid =
+    isUser1FormValid &&
+    (user2Prefs.songs || user2Prefs.genres) &&
     context;
 
   return (
@@ -67,14 +144,30 @@ const App: React.FC = () => {
         </header>
 
         <main>
-          {stage === AppStage.INPUT && (
-            <div className="bg-slate-800/50 rounded-2xl shadow-lg p-6 backdrop-blur-sm border border-slate-700">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                <UserInput title="User 1" prefs={user1Prefs} setPrefs={setUser1Prefs} />
-                <UserInput title="User 2" prefs={user2Prefs} setPrefs={setUser2Prefs} />
+          {spotifyAuthError && (
+             <div className="bg-red-900/50 border border-red-700 text-red-300 p-4 rounded-lg text-center mb-6">
+               <p>{spotifyAuthError}</p>
+             </div>
+          )}
+          {stage === AppStage.INPUT_USER_1 && (
+            <div className="bg-slate-800/50 rounded-2xl shadow-lg p-6 backdrop-blur-sm border border-slate-700 animate-fade-in">
+              <UserInput title="User 1" prefs={user1Prefs} setPrefs={setUser1Prefs} />
+              <div className="mt-8 text-center">
+                <button
+                  onClick={() => setStage(AppStage.INPUT_USER_2)}
+                  disabled={!isUser1FormValid}
+                  className="bg-cyan-500 text-white font-bold py-3 px-8 rounded-full hover:bg-cyan-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-500/20"
+                >
+                  Next
+                </button>
               </div>
+            </div>
+          )}
 
-              <div>
+          {stage === AppStage.INPUT_USER_2 && (
+            <div className="bg-slate-800/50 rounded-2xl shadow-lg p-6 backdrop-blur-sm border border-slate-700 animate-fade-in">
+                <UserInput title="User 2" prefs={user2Prefs} setPrefs={setUser2Prefs} />
+              <div className="mt-6">
                 <label htmlFor="context" className="block text-lg font-semibold mb-2 text-cyan-300">Playlist Vibe</label>
                 <input
                   id="context"
@@ -86,35 +179,53 @@ const App: React.FC = () => {
                 />
               </div>
 
-              <div className="mt-8 text-center">
+              {error && (
+                <div className="bg-red-900/50 border border-red-700 text-red-300 p-4 rounded-lg text-center mt-6">
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <div className="mt-8 flex justify-center items-center gap-4">
+                 <button
+                    onClick={() => setStage(AppStage.INPUT_USER_1)}
+                    className="bg-slate-700 text-white font-bold py-3 px-8 rounded-full hover:bg-slate-600 transition-transform transform hover:scale-105"
+                  >
+                    Back
+                  </button>
                 <button
                   onClick={() => handleGenerate('taster')}
                   disabled={!isFormValid || isLoading}
                   className="bg-cyan-500 text-white font-bold py-3 px-8 rounded-full hover:bg-cyan-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-500/20"
                 >
-                  {isLoading ? <Loader /> : 'Generate Taster Playlist'}
+                  {isLoading ? <Loader size="sm" /> : 'Generate Taster Playlist'}
                 </button>
               </div>
             </div>
           )}
 
-          {isLoading && stage !== AppStage.INPUT && (
+          {isLoading && (stage !== AppStage.INPUT_USER_1 && stage !== AppStage.INPUT_USER_2) && (
             <div className="text-center p-8">
               <Loader />
               <p className="mt-4 text-slate-400">Scouting for the perfect vibes...</p>
             </div>
           )}
 
-          {error && (
+          {error && stage !== AppStage.INPUT_USER_2 && (
             <div className="bg-red-900/50 border border-red-700 text-red-300 p-4 rounded-lg text-center">
               <p>{error}</p>
-              <button onClick={resetApp} className="mt-2 text-sm underline hover:text-white">Try again</button>
+              <button onClick={resetApp} className="mt-2 text-sm underline hover:text-white">Start Over</button>
             </div>
           )}
 
           {playlist && (stage === AppStage.TASTER_RESULT || stage === AppStage.FULL_PLAYLIST) && (
             <div className="animate-fade-in">
-              <PlaylistDisplay playlist={playlist} />
+              <PlaylistDisplay
+                playlist={playlist}
+                onExport={handleExportPlaylist}
+                isExporting={isExporting}
+                exportSuccessUrl={exportSuccessUrl}
+                exportError={exportError}
+              />
 
               {stage === AppStage.TASTER_RESULT && (
                 <div className="mt-8 text-center bg-slate-800/50 rounded-2xl shadow-lg p-6 border border-slate-700">
@@ -126,7 +237,7 @@ const App: React.FC = () => {
                       disabled={isLoading}
                       className="bg-fuchsia-500 text-white font-bold py-3 px-8 rounded-full hover:bg-fuchsia-400 disabled:bg-slate-600 transition-transform transform hover:scale-105 shadow-lg shadow-fuchsia-500/20"
                     >
-                      {isLoading ? <Loader /> : "Let's Go!"}
+                      {isLoading ? <Loader size="sm" /> : "Let's Go!"}
                     </button>
                      <button
                       onClick={resetApp}

@@ -1,8 +1,12 @@
 
 export interface UserPreferences {
   songs: string;
-  artists: string;
   genres: string;
+}
+
+export interface SongWithArtist {
+  title: string;
+  artist: string;
 }
 
 export interface Song {
@@ -17,7 +21,8 @@ export interface Playlist {
 }
 
 export enum AppStage {
-    INPUT = 'INPUT',
+    INPUT_USER_1 = 'INPUT_USER_1',
+    INPUT_USER_2 = 'INPUT_USER_2',
     TASTER_RESULT = 'TASTER_RESULT',
     FULL_PLAYLIST = 'FULL_PLAYLIST'
 }
