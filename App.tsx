@@ -1,13 +1,10 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { UserPreferences, Playlist, AppStage } from './types';
 import { generatePlaylist } from './services/geminiService';
-import { getAccessToken, redirectToAuthFlow, exportPlaylistToSpotify } from './services/spotifyService';
 import UserInput from './components/UserInput';
 import PlaylistDisplay from './components/PlaylistDisplay';
 import Loader from './components/Loader';
 import { MusicIcon } from './components/icons';
-import { CLIENT_ID } from './spotify.config';
 
 const App: React.FC = () => {
   const [user1Prefs, setUser1Prefs] = useState<UserPreferences>({ songs: '', genres: '' });
@@ -18,53 +15,35 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<AppStage>(AppStage.INPUT_USER_1);
 
-  // Spotify Export State
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportSuccessUrl, setExportSuccessUrl] = useState<string | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [spotifyAuthError, setSpotifyAuthError] = useState<string | null>(null);
-  const [isSpotifyReady, setIsSpotifyReady] = useState(false);
+  const loadingMessages = [
+    'Scouting for the perfect vibes...',
+    'Analyzing your musical tastes...',
+    'Finding hidden gems...',
+    'Crafting your unique playlist...',
+    'Almost there...',
+  ];
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
-
-  // Handle Spotify Auth Callback
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const error = params.get('error');
-
-    if (error) {
-      setSpotifyAuthError("Spotify authentication failed. Please try again.");
-      // Clean up URL
-      window.history.pushState({}, document.title, window.location.pathname);
-      return;
+    let interval: NodeJS.Timeout | undefined;
+    // Only cycle messages during the main playlist generation loading screen
+    if (isLoading && stage !== AppStage.INPUT_USER_1 && stage !== AppStage.INPUT_USER_2) {
+      setCurrentMessageIndex(0); // Reset on start
+      interval = setInterval(() => {
+        setCurrentMessageIndex(prevIndex => (prevIndex + 1) % loadingMessages.length);
+      }, 2500); // Change message every 2.5 seconds
     }
-
-    if (code) {
-      // We have a code, let's exchange it for a token
-      getAccessToken(CLIENT_ID, code)
-        .then(() => {
-          setIsSpotifyReady(true);
-           // Clean up URL and remove code
-          window.history.pushState({}, document.title, window.location.pathname);
-        })
-        .catch(err => {
-          console.error(err);
-          setSpotifyAuthError("Failed to get Spotify access token.");
-        });
-    } else {
-        // Check if token already exists in local storage
-        if (localStorage.getItem('spotify_access_token')) {
-            setIsSpotifyReady(true);
+    return () => {
+        if (interval) {
+            clearInterval(interval);
         }
-    }
-  }, []);
+    };
+  }, [isLoading, stage]);
 
   const handleGenerate = useCallback(async (size: 'taster' | 'full') => {
     setIsLoading(true);
     setError(null);
     setPlaylist(null);
-    setExportSuccessUrl(null);
-    setExportError(null);
 
     try {
       const result = await generatePlaylist(user1Prefs, user2Prefs, context, size);
@@ -88,39 +67,8 @@ const App: React.FC = () => {
     setContext('');
     setPlaylist(null);
     setError(null);
-    setExportSuccessUrl(null);
-    setExportError(null);
-    setSpotifyAuthError(null);
     setStage(AppStage.INPUT_USER_1);
   };
-
-  const handleExportPlaylist = async () => {
-    if (!playlist) return;
-    
-    setExportError(null);
-    setExportSuccessUrl(null);
-
-    if (!isSpotifyReady) {
-        if (CLIENT_ID === "PASTE_YOUR_SPOTIFY_CLIENT_ID_HERE") {
-             setExportError("Spotify Client ID is not configured. Please update spotify.config.ts");
-             return;
-        }
-        await redirectToAuthFlow(CLIENT_ID);
-        return;
-    }
-
-    setIsExporting(true);
-    try {
-        const spotifyPlaylist = await exportPlaylistToSpotify(playlist.songs, playlist.playlistName);
-        setExportSuccessUrl(spotifyPlaylist.external_urls.spotify);
-    } catch (err) {
-        console.error(err);
-        setExportError(err instanceof Error ? err.message : "An unknown error occurred during export.");
-    } finally {
-        setIsExporting(false);
-    }
-  };
-
 
   const isUser1FormValid = !!(user1Prefs.songs || user1Prefs.genres);
   const isFormValid =
@@ -128,35 +76,40 @@ const App: React.FC = () => {
     (user2Prefs.songs || user2Prefs.genres) &&
     context;
 
+  const showLoadingAnimation = isLoading && stage !== AppStage.INPUT_USER_1 && stage !== AppStage.INPUT_USER_2;
+
   return (
-    <div className="min-h-screen bg-slate-900 text-gray-200 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="relative min-h-screen bg-black text-gray-200 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-96 h-96 -translate-x-1/2 -translate-y-1/2">
+            <div className={`w-full h-full bg-cyan-500/10 rounded-full filter blur-3xl opacity-50 transition-transform,opacity duration-1000 ${showLoadingAnimation ? 'animate-pulse-glow' : ''}`}></div>
+        </div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 translate-x-1/2 translate-y-1/2">
+            <div className={`w-full h-full bg-blue-500/10 rounded-full filter blur-3xl opacity-50 transition-transform,opacity duration-1000 ${showLoadingAnimation ? 'animate-pulse-glow' : ''}`} style={{ animationDelay: '3s' }}></div>
+        </div>
+      </div>
+      <div className="relative z-10 max-w-6xl mx-auto">
         <header className="text-center mb-8">
           <div className="flex items-center justify-center gap-4">
             <MusicIcon className="w-10 h-10 text-cyan-400" />
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-transparent bg-clip-text">
+            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">
               SoundScout
             </h1>
           </div>
-          <p className="mt-2 text-lg text-slate-400">
+          <p className="mt-2 text-lg text-gray-400">
             Create collaborative playlists from your shared musical tastes.
           </p>
         </header>
 
         <main>
-          {spotifyAuthError && (
-             <div className="bg-red-900/50 border border-red-700 text-red-300 p-4 rounded-lg text-center mb-6">
-               <p>{spotifyAuthError}</p>
-             </div>
-          )}
           {stage === AppStage.INPUT_USER_1 && (
-            <div className="bg-slate-800/50 rounded-2xl shadow-lg p-6 backdrop-blur-sm border border-slate-700 animate-fade-in">
-              <UserInput title="User 1" prefs={user1Prefs} setPrefs={setUser1Prefs} />
+            <div className="bg-zinc-900/50 rounded-2xl shadow-lg shadow-blue-500/20 p-6 backdrop-blur-sm border border-blue-800/30 animate-fade-in">
+              <UserInput title="Listener 1" prefs={user1Prefs} setPrefs={setUser1Prefs} />
               <div className="mt-8 text-center">
                 <button
                   onClick={() => setStage(AppStage.INPUT_USER_2)}
                   disabled={!isUser1FormValid}
-                  className="bg-cyan-500 text-white font-bold py-3 px-8 rounded-full hover:bg-cyan-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-500/20"
+                  className="bg-cyan-600 text-white font-bold py-3 px-8 rounded-full hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-600/30"
                 >
                   Next
                 </button>
@@ -165,8 +118,8 @@ const App: React.FC = () => {
           )}
 
           {stage === AppStage.INPUT_USER_2 && (
-            <div className="bg-slate-800/50 rounded-2xl shadow-lg p-6 backdrop-blur-sm border border-slate-700 animate-fade-in">
-                <UserInput title="User 2" prefs={user2Prefs} setPrefs={setUser2Prefs} />
+            <div className="bg-zinc-900/50 rounded-2xl shadow-lg shadow-blue-500/20 p-6 backdrop-blur-sm border border-blue-800/30 animate-fade-in">
+                <UserInput title="Listener 2" prefs={user2Prefs} setPrefs={setUser2Prefs} />
               <div className="mt-6">
                 <label htmlFor="context" className="block text-lg font-semibold mb-2 text-cyan-300">Playlist Vibe</label>
                 <input
@@ -175,7 +128,7 @@ const App: React.FC = () => {
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
                   placeholder="e.g., Chill study session, Road trip, Party..."
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-md py-2 px-3 focus:ring-2 focus:ring-cyan-400 focus:outline-none transition"
+                  className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-400 focus:outline-none transition"
                 />
               </div>
 
@@ -185,17 +138,17 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-8 flex justify-center items-center gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
                  <button
                     onClick={() => setStage(AppStage.INPUT_USER_1)}
-                    className="bg-slate-700 text-white font-bold py-3 px-8 rounded-full hover:bg-slate-600 transition-transform transform hover:scale-105"
+                    className="w-full sm:w-auto bg-zinc-800 text-white font-bold py-3 px-8 rounded-full hover:bg-zinc-700 transition-transform transform hover:scale-105"
                   >
                     Back
                   </button>
                 <button
                   onClick={() => handleGenerate('taster')}
                   disabled={!isFormValid || isLoading}
-                  className="bg-cyan-500 text-white font-bold py-3 px-8 rounded-full hover:bg-cyan-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg shadow-cyan-500/20"
+                  className="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-8 rounded-full hover:bg-blue-500 disabled:bg-zinc-700 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-600/20"
                 >
                   {isLoading ? <Loader size="sm" /> : 'Generate Taster Playlist'}
                 </button>
@@ -203,10 +156,12 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {isLoading && (stage !== AppStage.INPUT_USER_1 && stage !== AppStage.INPUT_USER_2) && (
+          {showLoadingAnimation && (
             <div className="text-center p-8">
               <Loader />
-              <p className="mt-4 text-slate-400">Scouting for the perfect vibes...</p>
+              <p key={currentMessageIndex} className="mt-4 text-gray-400 animate-fade-in-text">
+                {loadingMessages[currentMessageIndex]}
+              </p>
             </div>
           )}
 
@@ -221,27 +176,23 @@ const App: React.FC = () => {
             <div className="animate-fade-in">
               <PlaylistDisplay
                 playlist={playlist}
-                onExport={handleExportPlaylist}
-                isExporting={isExporting}
-                exportSuccessUrl={exportSuccessUrl}
-                exportError={exportError}
               />
 
               {stage === AppStage.TASTER_RESULT && (
-                <div className="mt-8 text-center bg-slate-800/50 rounded-2xl shadow-lg p-6 border border-slate-700">
+                <div className="mt-8 text-center bg-zinc-900/50 rounded-2xl shadow-lg shadow-blue-500/20 p-6 border border-blue-800/30">
                   <h3 className="text-2xl font-bold mb-4">Like what you hear?</h3>
-                  <p className="text-slate-400 mb-6">Let's create a full playlist for you.</p>
-                  <div className="flex justify-center gap-4">
+                  <p className="text-gray-400 mb-6">Let's create a full playlist for you.</p>
+                  <div className="flex flex-col sm:flex-row justify-center gap-4">
                     <button
                       onClick={() => handleGenerate('full')}
                       disabled={isLoading}
-                      className="bg-fuchsia-500 text-white font-bold py-3 px-8 rounded-full hover:bg-fuchsia-400 disabled:bg-slate-600 transition-transform transform hover:scale-105 shadow-lg shadow-fuchsia-500/20"
+                      className="w-full sm:w-auto bg-blue-600 text-white font-bold py-3 px-8 rounded-full hover:bg-blue-500 disabled:bg-zinc-700 transition-transform transform hover:scale-105 shadow-lg shadow-blue-600/20"
                     >
                       {isLoading ? <Loader size="sm" /> : "Let's Go!"}
                     </button>
                      <button
                       onClick={resetApp}
-                      className="bg-slate-700 text-white font-bold py-3 px-8 rounded-full hover:bg-slate-600 transition-transform transform hover:scale-105"
+                      className="w-full sm:w-auto bg-zinc-800 text-white font-bold py-3 px-8 rounded-full hover:bg-zinc-700 transition-transform transform hover:scale-105"
                     >
                       Start Over
                     </button>
@@ -252,7 +203,7 @@ const App: React.FC = () => {
                   <div className="mt-8 text-center">
                        <button
                       onClick={resetApp}
-                      className="bg-cyan-500 text-white font-bold py-3 px-8 rounded-full hover:bg-cyan-400 transition-transform transform hover:scale-105 shadow-lg shadow-cyan-500/20"
+                      className="bg-blue-600 text-white font-bold py-3 px-8 rounded-full hover:bg-blue-500 transition-transform transform hover:scale-105 shadow-lg shadow-blue-600/20"
                     >
                       Create Another Playlist
                     </button>

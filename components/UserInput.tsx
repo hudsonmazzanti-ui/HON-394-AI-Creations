@@ -147,26 +147,26 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold flex items-center gap-2 bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-transparent bg-clip-text">
+      <h2 className="text-2xl font-bold flex items-center gap-2 text-cyan-400">
         <UserIcon className="w-6 h-6 text-cyan-400" />
         {title}
       </h2>
 
       {/* NEW SONG INPUT SECTION */}
       <div className="space-y-3">
-        <label htmlFor={`${title}-artist-input`} className="block text-base font-semibold text-slate-300 flex items-center gap-2">
-          <MusicNoteIcon className="w-5 h-5 text-slate-400" />
+        <label htmlFor={`${title}-artist-input`} className="block text-base font-semibold text-gray-300 flex items-center gap-2">
+          <MusicNoteIcon className="w-5 h-5 text-gray-500" />
           Favorite Songs
         </label>
         
         {addedSongs.length > 0 && (
           <div className="flex flex-wrap gap-2 pb-2">
             {addedSongs.map((song, index) => (
-              <div key={index} className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-full py-1 pl-3 pr-1 text-sm animate-fade-in">
+              <div key={index} className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-full py-1 pl-3 pr-1 text-sm animate-fade-in">
                 <span className="font-medium text-white">{song.title}</span>
-                <span className="text-slate-400">- {song.artist}</span>
-                <button onClick={() => handleRemoveSong(index)} className="bg-slate-600 rounded-full p-0.5 hover:bg-red-500 group" aria-label={`Remove ${song.title}`}>
-                  <XIcon className="w-3 h-3 text-slate-300 group-hover:text-white" />
+                <span className="text-gray-400">- {song.artist}</span>
+                <button onClick={() => handleRemoveSong(index)} className="bg-zinc-700 rounded-full p-0.5 hover:bg-red-500 group" aria-label={`Remove ${song.title}`}>
+                  <XIcon className="w-3 h-3 text-gray-400 group-hover:text-white" />
                 </button>
               </div>
             ))}
@@ -174,7 +174,7 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
         )}
 
         {/* Artist Input */}
-        <div className="flex items-start gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2">
           <div className="flex-grow">
             <input
               id={`${title}-artist-input`}
@@ -182,7 +182,7 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
               value={artistInput}
               onChange={(e) => setArtistInput(e.target.value)}
               placeholder="Enter an artist's name..."
-              className="w-full bg-slate-700/50 border border-slate-600 rounded-md py-2 px-3 focus:ring-2 focus:ring-cyan-400 focus:outline-none transition"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-400 focus:outline-none transition"
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchSongs(); }}}
               disabled={isSearching || !!searchedArtist}
             />
@@ -190,14 +190,14 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
           <button
             onClick={handleSearchSongs}
             disabled={!artistInput.trim() || isSearching || !!searchedArtist}
-            className="bg-cyan-500 text-white font-bold py-2 px-4 rounded-md hover:bg-cyan-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+            className="w-full sm:w-auto bg-cyan-600 text-white font-bold py-2 px-4 rounded-md hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed transition-colors"
           >
             {isSearching ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : 'Find Songs'}
           </button>
           {searchedArtist && (
             <button
               onClick={resetArtistSearchState}
-              className="bg-slate-600 text-white font-bold py-2 px-4 rounded-md hover:bg-slate-500 transition-colors"
+              className="w-full sm:w-auto bg-zinc-700 text-white font-bold py-2 px-4 rounded-md hover:bg-zinc-600 transition-colors"
             >
               Cancel
             </button>
@@ -206,8 +206,8 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
 
         {/* Song List Display */}
         {searchedArtist && (
-          <div className="p-4 bg-slate-700/50 border border-slate-600 rounded-md mt-2 animate-fade-in">
-            <p className="font-semibold text-slate-300 mb-3">
+          <div className="p-4 bg-zinc-800/50 border border-blue-800/30 rounded-md mt-2 animate-fade-in">
+            <p className="font-semibold text-gray-300 mb-3">
               Songs by "{searchedArtist}"
             </p>
             <div className="space-y-3">
@@ -216,7 +216,7 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
                 value={songFilter}
                 onChange={(e) => setSongFilter(e.target.value)}
                 placeholder="Search songs..."
-                className="w-full bg-slate-800 border border-slate-600 rounded-md py-2 px-3 focus:ring-2 focus:ring-fuchsia-500 focus:outline-none transition"
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 autoFocus
               />
               <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
@@ -229,8 +229,8 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
                       disabled={isAdded}
                       className={`w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                         isAdded
-                          ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                          : 'bg-slate-700 hover:bg-slate-600 text-white'
+                          ? 'bg-zinc-700 text-gray-500 cursor-not-allowed'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-white'
                       }`}
                     >
                       {songTitle} {isAdded && '(Added)'}
@@ -238,47 +238,47 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
                   );
                 })}
                 {isSearching && (
-                  <div className="flex items-center justify-center p-2 text-sm text-slate-400">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400 mr-2"></div>
+                  <div className="flex items-center justify-center p-2 text-sm text-gray-400">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
                     Loading...
                   </div>
                 )}
               </div>
                {filteredSongs.length === 0 && songFilter && !isSearching && (
-                  <p className="text-sm text-slate-400 text-center py-2">No matching songs found.</p>
+                  <p className="text-sm text-gray-400 text-center py-2">No matching songs found.</p>
               )}
             </div>
 
             {!isSearching && songList.length === 0 && (
-                <p className="text-sm text-slate-400 mt-2">
+                <p className="text-sm text-gray-400 mt-2">
                     Couldn't find any songs for "{searchedArtist}". Please check the spelling or try another artist.
                 </p>
             )}
 
             <div className="flex items-center gap-2 my-4">
-              <hr className="flex-grow border-slate-600" />
-              <span className="text-xs text-slate-400">OR</span>
-              <hr className="flex-grow border-slate-600" />
+              <hr className="flex-grow border-zinc-700" />
+              <span className="text-xs text-gray-500">OR</span>
+              <hr className="flex-grow border-zinc-700" />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor={`${title}-manual-song-input`} className="text-sm font-medium text-slate-300">
+              <label htmlFor={`${title}-manual-song-input`} className="text-sm font-medium text-gray-300">
                 Can't find a song? Add it manually.
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                   <input
                       id={`${title}-manual-song-input`}
                       type="text"
                       value={manualSongInput}
                       onChange={(e) => setManualSongInput(e.target.value)}
                       placeholder="Enter song title..."
-                      className="flex-grow w-full bg-slate-800 border border-slate-600 rounded-md py-2 px-3 focus:ring-2 focus:ring-fuchsia-500 focus:outline-none transition"
+                      className="flex-grow w-full bg-zinc-900 border border-zinc-700 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleManualAdd(); }}}
                   />
                   <button
                       onClick={handleManualAdd}
                       disabled={!manualSongInput.trim()}
-                      className="bg-fuchsia-500 text-white font-bold py-2 px-4 rounded-md hover:bg-fuchsia-400 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                      className="w-full sm:w-auto bg-cyan-600 text-white font-bold py-2 px-4 rounded-md hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                   >
                       Add
                   </button>
@@ -291,11 +291,11 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
       {/* GENRE SECTION */}
       <div className="space-y-3">
         <div>
-          <label className="block text-base font-semibold mb-2 text-slate-300 flex items-center gap-2">
-            <MusicIcon className="w-5 h-5 text-slate-400" />
+          <label className="block text-base font-semibold mb-2 text-gray-300 flex items-center gap-2">
+            <MusicIcon className="w-5 h-5 text-gray-500" />
             Favorite Genres
           </label>
-          <p className="text-sm text-slate-400">Select your favorite genres from the list below.</p>
+          <p className="text-sm text-gray-400">Select your favorite genres from the list below.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {POPULAR_GENRES.map(genre => (
@@ -305,8 +305,8 @@ const UserInput: React.FC<UserInputProps> = ({ title, prefs, setPrefs }) => {
               onClick={() => handleGenreToggle(genre)}
               className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-colors duration-200 ${
                 selectedGenres.has(genre)
-                  ? 'bg-cyan-500 border-cyan-400 text-white'
-                  : 'bg-slate-700/50 border-slate-600 hover:bg-slate-600'
+                  ? 'bg-blue-500 border-blue-400 text-white'
+                  : 'bg-zinc-800/50 border-zinc-700 hover:bg-blue-950/70 hover:border-blue-700'
               }`}
             >
               {genre}

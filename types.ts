@@ -12,7 +12,7 @@ export interface SongWithArtist {
 export interface Song {
   title: string;
   artist: string;
-  source: 'User 1' | 'User 2' | 'Both';
+  source: 'Listener 1' | 'Listener 2' | 'Both';
 }
 
 export interface Playlist {
